@@ -101,6 +101,7 @@
       restart_policy: always
       name: prometheus
       image: prom/prometheus:latest
+      user: '1000'
       volumes:
         - "{{ root_directory }}/data/prometheus:/prometheus"
         - "{{ root_directory }}/config/prometheus:/etc/prometheus"
