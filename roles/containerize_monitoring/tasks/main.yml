@@ -1,6 +1,5 @@
 ---
 # This role creates the docker containers required for the monitoring stack
-...
 
   # Make sure we have git installed
   - name: Install git
