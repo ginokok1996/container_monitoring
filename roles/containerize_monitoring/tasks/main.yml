@@ -17,6 +17,7 @@
 
   # make sure we have the desired directories in the mount location
   - name: Make sure we have desired directories
+    become: false
     file:
       path: "{{ root_directory }}/{{ item }}"
       state: directory
