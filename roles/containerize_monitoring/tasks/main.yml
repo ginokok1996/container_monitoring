@@ -110,6 +110,7 @@
     docker_container:
       restart_policy: always
       name: prometheus
+      user: '1000'
       image: prom/prometheus:latest
       volumes:
         - "{{ root_directory }}/data/prometheus:/prometheus"
