@@ -24,6 +24,14 @@
       mode: "0755"  
     with_items: "{{ dirNames }}"
 
+    # make sure we have the desired directories in the data
+  - name: Make sure we have desired data directories
+    file:
+      path: "{{ root_directory }}/data/{{ item }}"
+      state: directory
+      mode: "0755"  
+    with_items: ['alertmanager', 'prometheus', 'grafana']
+
 
   # copy the config files to the machine
   - name: Copy the config files to the machine
