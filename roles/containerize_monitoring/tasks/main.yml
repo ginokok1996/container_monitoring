@@ -1,3 +1,146 @@
 ---
 # This role creates the docker containers required for the monitoring stack
 ...
+
+  # Make sure we have git installed
+  - name: Install git
+    yum:
+      name: 
+        - git
+      state: latest
+  
+  # clone the repository
+  - name: Cloning the repository
+    git:
+      repo: "{{ repository }}"
+      dest: "{{ clone_location }}"
+      version: "{{ version }}"
+
+  # make sure we have the desired directories in the mount location
+  - name: Make sure we have desired directories
+    file:
+      path: "{{ root_directory }}/{{ item }}"
+      state: directory
+      mode: "0755"  
+    with_items: "{{ dirNames }}"
+
+
+  # copy the config files to the machine
+  - name: Copy the config files to the machine
+    block:
+      - name: copy the config files
+        copy:
+          src: "{{ clone_location }}/config"
+          dest: "{{ root_directory }}"
+          remote_src: yes
+    rescue:
+      - name: Removing the repository
+        file:
+          path: "{{ clone_location }}"
+          state: absent
+
+  # create the monitoring network
+  - name: Create monitor network
+    docker_network:
+      name: monitor
+
+  # create the prometheus container
+  - name: Create a prometheus container
+    docker_container:
+      restart_policy: always
+      name: prometheus
+      image: prom/prometheus:latest
+      volumes:
+        - "{{ root_directory }}/data/prometheus:/prometheus"
+        - "{{ root_directory }}/config/prometheus:/etc/prometheus"
+      command:
+        - '-config.file=/etc/prometheus/prometheus.yml'
+        - '-alertmanager.url=http://18.157.135.12:9093'
+      exposed_ports:
+        - 9090
+      ports: 
+        - 9090:9090
+      links:
+        - cadvisor:cadvisor
+        - node-exporter:node-exporter
+      hostname: prometheus.monitor.docker
+      networks:
+        - name: monitor
+          aliases:
+            - prometheus.monitor.docker
+
+  # create the node-exporter
+  - name: Create a node-exporter container
+    docker_container:
+      restart_policy: always
+      name: node-exporter
+      image: prom/node-exporter:latest
+      exposed_ports:
+        - 9100
+      hostname: node-exporter.monitor.docker
+      networks:
+        - name: monitor
+          aliases:
+            - node-exporter.monitor.docker
+
+  # create the cadvisor container
+  - name: Create a cadvisor container
+    docker_container:
+      restart_policy: always
+      name: cadvisor
+      image: google/cadvisor:latest
+      volumes:
+        - /:/rootfs:ro
+        - /var/run:/var/run:rw
+        - /sys:/sys:ro
+        - /var/lib/docker/:/var/lib/docker:ro
+      exposed_ports:
+        - 8080
+      hostname: cadvisor.monitor.docker
+      networks:
+        - name: monitor
+          aliases:
+            - cadvisor.monitor.docker
+
+  # create the alertmanager container
+  - name: Create a alertmanager container
+    docker_container:
+      restart_policy: always
+      name: alertmanager
+      image: prom/alertmanager:latest
+      command:
+        - '--config.file=/etc/alertmanager/config.yml'
+      ports:
+        - 9093:9093
+      volumes:
+        - "{{ root_directory }}/data/alertmanager:/alertmanager"
+        - "{{ root_directory }}/config/alertmanager/:/etc/alertmanager/"
+      hostname: alertmanager.monitor.docker
+      networks:
+        - name: monitor
+          aliases:
+            - alertmanager.monitor.docker
+
+  # create the grafana container
+  - name: Create a grafana container
+    docker_container:
+      restart_policy: always
+      name: grafana
+      image: grafana/grafana:latest
+      ports:
+        - 3000:3000
+      links:
+        - prometheus:prometheus
+      volumes:
+        - "{{ root_directory }}/data/grafana:/var/lib/grafana"
+      hostname: grafana.monitor.docker
+      networks:
+        - name: monitor
+          aliases:
+            - grafana.monitor.docker
+  
+  # remove the cloned repository
+  - name: Removing the repository
+    file:
+      path: "{{ clone_location }}"
+      state: absent
