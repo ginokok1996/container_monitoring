@@ -43,31 +43,6 @@
     docker_network:
       name: monitor
 
-  # create the prometheus container
-  - name: Create a prometheus container
-    docker_container:
-      restart_policy: always
-      name: prometheus
-      image: prom/prometheus:latest
-      volumes:
-        - "{{ root_directory }}/data/prometheus:/prometheus"
-        - "{{ root_directory }}/config/prometheus:/etc/prometheus"
-      command:
-        - '-config.file=/etc/prometheus/prometheus.yml'
-        - '-alertmanager.url=http://3.71.182.48:9093'
-      exposed_ports:
-        - 9090
-      ports: 
-        - 9090:9090
-      links:
-        - cadvisor:cadvisor
-        - node-exporter:node-exporter
-      hostname: prometheus.monitor.docker
-      networks:
-        - name: monitor
-          aliases:
-            - prometheus.monitor.docker
-
   # create the node-exporter
   - name: Create a node-exporter container
     docker_container:
@@ -119,6 +94,31 @@
         - name: monitor
           aliases:
             - alertmanager.monitor.docker
+
+  # create the prometheus container
+  - name: Create a prometheus container
+    docker_container:
+      restart_policy: always
+      name: prometheus
+      image: prom/prometheus:latest
+      volumes:
+        - "{{ root_directory }}/data/prometheus:/prometheus"
+        - "{{ root_directory }}/config/prometheus:/etc/prometheus"
+      command:
+        - '-config.file=/etc/prometheus/prometheus.yml'
+        - '-alertmanager.url=http://3.71.182.48:9093'
+      exposed_ports:
+        - 9090
+      ports: 
+        - 9090:9090
+      links:
+        - cadvisor:cadvisor
+        - node-exporter:node-exporter
+      hostname: prometheus.monitor.docker
+      networks:
+        - name: monitor
+          aliases:
+            - prometheus.monitor.docker
 
   # create the grafana container
   - name: Create a grafana container
