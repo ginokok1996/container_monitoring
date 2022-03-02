@@ -90,6 +90,7 @@
     docker_container:
       restart_policy: always
       name: alertmanager
+      user: '1000'
       image: prom/alertmanager:latest
       command:
         - '--config.file=/etc/alertmanager/config.yml'
