@@ -1,0 +1,177 @@
+---
+# This role allows you to create a partition
+# It supports selecting which disk, what size partition, what type of disk label if not present,
+# what type of filesystem if no other partitions are present and makes sure the default directories are created.
+
+
+  # Retrieves disk list
+  - name: get disk list
+    shell: "parted -l"
+    register: disks
+    no_log: true
+
+  # Prints out the available disks
+  - name: Display parted list
+    debug:
+      msg: "{{ disks.stdout.split('\n') }}"
+
+  # retrieve what disk needs to be used
+  - pause:
+      prompt: "Please enter the disk name you wish to use"
+      echo: yes
+    register: result
+  - set_fact:
+      device: "{{ result.user_input }}"
+    no_log: true
+
+  # test with ls to see if disk exists
+  - name: Check if disk exists
+    shell: "ls {{ device }}"
+  - debug:
+      msg: "Using device: {{ device }}"
+
+  # Retrieve the device info so we can define the number, part_start & part_end for the partition
+  - name: Read device information of chosen device
+    parted: "device={{ device }} unit=MiB"
+    register: device_info
+    no_log: true
+
+    # get and show available disk space
+  - name: check if there is a label
+    shell: "parted {{ device }} unit MB print free 2>&1 | grep Error | cat"
+    register: labelError
+
+  # prompt label input if there is no label present on the disk yet
+  - pause:
+      prompt: "No Disk label found, please provide disk label type you wish to use (bsd, loop, gpt, mac, msdos, pc98, sun)"
+      echo: yes
+    register: result
+    when: labelError.stdout != ""
+  - set_fact:
+      label: "{{ result.user_input }}"
+    no_log: true
+    when: labelError.stdout != ""
+
+  # check if valid disk label is provided 
+  - assert:
+      that:
+      - label|lower in [ 'bsd', 'loop', 'gpt', 'mac', 'msdos', 'pc98', 'sun' ]
+      fail_msg: "Disk label should be one of: bsd, loop, gpt, mac, msdos, pc98, sun"
+    no_log: true
+    when: labelError.stdout != ""
+
+  # create disk label if not present
+  - name: Create disk label if not present
+    shell: "parted {{ device }} mklabel {{ label }}"
+    when: labelError.stdout != ""
+
+  # ask for filesystem if no partitions are present
+  - pause:
+      prompt: "No partitions found, please provide file system you wish to use (xfs, btrfs, ext(2,3,4), ext4dev, f2fs, lvm, ocfs2, reiserfs, vfat, swap, ufs)"
+      echo: yes
+    register: result
+    when: device_info.partitions | length == 0
+  - set_fact:
+      filesystem: "{{ result.user_input }}"
+    no_log: true
+    when: device_info.partitions | length == 0
+
+  #check if valid filesystem is provided
+  - assert:
+      that:
+      - filesystem|lower in [ 'xfs', 'btrfs', 'ext2', 'ext3', 'ext4', 'ext4dev', 'f2fs', 'lvm', 'ocfs2', 'reiserfs', 'vfat', 'swap', 'ufs' ]
+      fail_msg: "Filesystem should be one of: xfs, btrfs, ext(2,3,4), ext4dev, f2fs, lvm. ocfs2, reiserfs, vfat, swap, ufs"
+    no_log: true
+    when: device_info.partitions | length == 0
+
+  # get and show available disk space
+  - name: get free space of chosen device
+    shell: "parted {{ device }} unit MB print free | grep 'Free Space' | tail -n1 | awk '{print \"Free space: \" $3}'"
+    register: freeSpace
+  - debug:
+      msg: "{{ freeSpace.stdout }}"
+
+  # retrieve what partition size needs to be used
+  - pause:
+      prompt: "Please provide partition size in MB format"
+      echo: yes
+    register: result
+  - set_fact:
+      size: "{{ result.user_input }}"
+    no_log: true
+
+  # make sure the user provided an whole positive integer
+  - name: Ensure that file size is a whole positive number
+    assert:
+      that:
+        - "{{ size }} | type_debug == 'int'"
+        - "{{ size }} is regex('^[0-9]+$')"
+    no_log: true
+  - debug:
+      msg: "{{ size }}"
+
+  # Create a partition with the provided size
+  - name: Create a new primary partition with provided size
+    parted:
+      device: "{{ device }}"
+      number: "{{ device_info.partitions | length + 1 }}"
+      state: present
+      part_start: "{% if device_info.partitions | length > 0 %}{{ device_info.partitions[-1].end + 1 }}MiB{% else %}0%{% endif %}"
+      part_end: "{% if device_info.partitions | length > 0 %}{{ device_info.partitions[-1].end + 1 + size | int }}MiB{% else %}{{ size | int }}MiB{% endif %}"
+
+  # Formats the new partition
+  - name: format the new partition
+    filesystem:
+     fstype: "{% if device_info.partitions | length > 0 %}{{ device_info.partitions[-1].fstype }}{% else %}{{ filesystem }}{% endif %}"
+     dev: "{{ device }}{{ device_info.partitions | length + 1 }}"
+
+  - name: mount partition block
+    block:
+      # Retrieves mount list
+      - name: get mounted list
+        shell: "df -hT"
+        register: mountedList
+        no_log: true
+
+      # Prints out the currently mounted directories
+      - name: Display mounted list
+        debug:
+          msg: "{{ mountedList.stdout.split('\n') }}"
+          
+      # retrieve what path needs to be used for the mounting of the partition
+      - pause:
+          prompt: "Please provide the directory path you want to mount this partition on (E.g: /mount/xvda)"
+          echo: yes
+        register: result
+      - set_fact:
+          directory: "{{ result.user_input }}"
+        no_log: true
+
+      - command: "mountpoint {{ directory }}"
+        register: mpoint
+        failed_when: '"is a mountpoint" in mpoint.stdout'
+
+      # Creates a mount directory for the new partition
+      - name: Create a mount directory
+        file:
+          path: "{{ directory }}"
+          state: directory
+          mode: '0755'
+
+      # Mounts the newly created partition
+      - name: Mount new partition
+        mount:
+          fstype: "{% if device_info.partitions | length > 0 %}{{ device_info.partitions[-1].fstype }}{% else %}{{ filesystem }}{% endif %}"
+          src: "{{ device }}{{ device_info.partitions | length + 1 }}"
+          path: "{{ directory }}"
+          state: mounted
+    rescue:
+      - name: Remove partition if mounting failed
+        parted:
+          device: "{{ device }}"
+          number: "{{ device_info.partitions | length + 1 }}"
+          state: absent
+
+
+
+...

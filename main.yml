@@ -1,0 +1,37 @@
+---
+# The monitoring stack playbook
+# Gino Kok
+
+- name: Containerize monitoring stack
+  hosts: all
+  become: true
+
+  vars_prompt:
+  # prompt the user if the creation of a partition is required
+  - name: "create_partition"
+    prompt: "Do you want to create a partition (yes/no)?"
+    private: no
+
+  # Retrieve the directory that holds the apps, appl & data folder
+  - name: "directory"
+    prompt: "Please provide the directory where the config files & data will be stored"
+    private: no
+
+  # Retrieve what version of the deploy needs to be used (defaults to "master")
+  - name: "deploy_version"
+    prompt: "What version do you want to use? (leave blank for latest)"
+    private: no
+    default: "master"
+
+  roles:
+    - role: docker_installer
+
+    - role: make_partition
+      when: create_partition | bool
+      
+    - role: containerize_monitoring
+      clone_location: "/tmp/monitoring"
+      repository: "https://github.com/ginokok1996/container_monitoring.git"
+      version: "{{ deploy_version }}"
+      root_directory: "{{ directory }}"
+      dirNames: ['appl', 'apps', 'data', 'config']
