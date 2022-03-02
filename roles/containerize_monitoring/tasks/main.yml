@@ -124,6 +124,7 @@
 
   # create the grafana container
   - name: Create a grafana container
+    become: false
     docker_container:
       restart_policy: always
       name: grafana
