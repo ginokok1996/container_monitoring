@@ -116,7 +116,6 @@
         - "{{ root_directory }}/config/prometheus:/etc/prometheus"
       command:
         - '--config.file=/etc/prometheus/prometheus.yml'
-        - '--alertmanager.url=http://3.71.182.48:9093'
       exposed_ports:
         - 9090
       ports: 
