@@ -97,6 +97,7 @@
 
   # create the prometheus container
   - name: Create a prometheus container
+    become: false
     docker_container:
       restart_policy: always
       name: prometheus
