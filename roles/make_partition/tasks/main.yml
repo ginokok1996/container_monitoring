@@ -6,6 +6,7 @@
 
   # Retrieves disk list
   - name: get disk list
+    become: true
     shell: "parted -l"
     register: disks
     no_log: true
@@ -32,12 +33,14 @@
 
   # Retrieve the device info so we can define the number, part_start & part_end for the partition
   - name: Read device information of chosen device
+    become: true
     parted: "device={{ device }} unit=MiB"
     register: device_info
     no_log: true
 
     # get and show available disk space
   - name: check if there is a label
+    become: true
     shell: "parted {{ device }} unit MB print free 2>&1 | grep Error | cat"
     register: labelError
 
@@ -62,6 +65,7 @@
 
   # create disk label if not present
   - name: Create disk label if not present
+    become: true
     shell: "parted {{ device }} mklabel {{ label }}"
     when: labelError.stdout != ""
 
@@ -86,6 +90,7 @@
 
   # get and show available disk space
   - name: get free space of chosen device
+    become: true
     shell: "parted {{ device }} unit MB print free | grep 'Free Space' | tail -n1 | awk '{print \"Free space: \" $3}'"
     register: freeSpace
   - debug:
@@ -112,6 +117,7 @@
 
   # Create a partition with the provided size
   - name: Create a new primary partition with provided size
+    become: true
     parted:
       device: "{{ device }}"
       number: "{{ device_info.partitions | length + 1 }}"
@@ -121,6 +127,7 @@
 
   # Formats the new partition
   - name: format the new partition
+    become: true
     filesystem:
      fstype: "{% if device_info.partitions | length > 0 %}{{ device_info.partitions[-1].fstype }}{% else %}{{ filesystem }}{% endif %}"
      dev: "{{ device }}{{ device_info.partitions | length + 1 }}"
@@ -160,6 +167,7 @@
 
       # Mounts the newly created partition
       - name: Mount new partition
+        become: true
         mount:
           fstype: "{% if device_info.partitions | length > 0 %}{{ device_info.partitions[-1].fstype }}{% else %}{{ filesystem }}{% endif %}"
           src: "{{ device }}{{ device_info.partitions | length + 1 }}"
@@ -167,6 +175,7 @@
           state: mounted
     rescue:
       - name: Remove partition if mounting failed
+        become: true
         parted:
           device: "{{ device }}"
           number: "{{ device_info.partitions | length + 1 }}"

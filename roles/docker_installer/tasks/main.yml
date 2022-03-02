@@ -3,6 +3,7 @@
 
   # Make sure we have the latest yum utils version
   - name: Install required packages
+    become: true
     yum:
       name: 
         - yum-utils
@@ -12,6 +13,7 @@
 
   # Adds the docker-ce repository to the machine
   - name: creating a docker repository
+    become: true
     yum_repository:
       description: repo for docker
       name: docker-ce
@@ -21,6 +23,7 @@
 
   # Installs docker on the machine
   - name: install docker-ce
+    become: true
     yum:
       name:
         - docker-ce
@@ -29,6 +32,7 @@
       state: present
   # Retrieves the docker version
   - name: get docker version
+    become: true
     shell: "docker -v"
     register: version
 
@@ -37,6 +41,7 @@
   
   # Starts the docker service and enables docker on boot
   - name: Start Docker service
+    become: true
     service:
       name: docker
       state: started
@@ -44,6 +49,7 @@
 
   # Install the Docker SDK module      
   - name: Install Docker SDK
+    become: true
     pip:
       name: docker
 ...
