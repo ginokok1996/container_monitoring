@@ -17,7 +17,6 @@
 
   # make sure we have the desired directories in the mount location
   - name: Make sure we have desired directories
-    become: false
     file:
       path: "{{ root_directory }}/{{ item }}"
       state: directory
@@ -98,7 +97,6 @@
 
   # create the prometheus container
   - name: Create a prometheus container
-    become: false
     docker_container:
       restart_policy: always
       name: prometheus
@@ -125,7 +123,6 @@
 
   # create the grafana container
   - name: Create a grafana container
-    become: false
     docker_container:
       restart_policy: always
       name: grafana

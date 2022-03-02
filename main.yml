@@ -4,7 +4,7 @@
 
 - name: Containerize monitoring stack
   hosts: all
-  become: true
+  become: false
 
   vars_prompt:
   # prompt the user if the creation of a partition is required
@@ -28,7 +28,7 @@
 
     - role: make_partition
       when: create_partition | bool
-      
+
     - role: containerize_monitoring
       clone_location: "/tmp/monitoring"
       repository: "https://github.com/ginokok1996/container_monitoring.git"
